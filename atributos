@@ -1,0 +1,7 @@
+Los productos van a tener:
+- id
+- nombre
+- descripcion
+- stock
+- precio
+- foto
