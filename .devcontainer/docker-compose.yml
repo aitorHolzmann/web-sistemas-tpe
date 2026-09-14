@@ -30,9 +30,6 @@ services:
       - "8080:8080"
     volumes:
       - ..:/workspace:cached
-    # "sleep infinity" mantiene el contenedor vivo para que VS Code se
-    # pueda conectar (devcontainer). El Makefile igual le pasa comandos
-    # puntuales con "docker compose run", que ignoran este command.
     command: sleep infinity
 
 volumes:
