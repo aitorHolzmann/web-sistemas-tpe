@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 
 	//Esperamos a que la DB este lista para recibir peticiones.
 	var pingErr error
-	for i := 0; i < 10; i++ {
+	for i := 0; i < 30; i++ {
 		if pingErr = conn.Ping(); pingErr == nil {
 			break
 		}

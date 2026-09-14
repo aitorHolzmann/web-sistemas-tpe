@@ -18,9 +18,9 @@
 # la definimos una vez y la reusamos como $(COMPOSE).
 #   -f                  -> le decimos a qué docker-compose.yml apuntar
 #                          (vive en .devcontainer/, no en la raíz)
-#   --project-directory . -> resuelve el .env desde la raíz del repo,
-#                          no desde .devcontainer/
-COMPOSE = docker compose -f .devcontainer/docker-compose.yml --project-directory . --env-file .env
+#   --env-file .env       -> carga las variables del .env de la raíz del repo.
+#                            Los paths del compose se resuelven junto al YAML.
+COMPOSE = docker compose -f .devcontainer/docker-compose.yml --env-file .env
 
 # "make test" (o directamente "make", ver .DEFAULT_GOAL abajo) es el punto
 # de entrada único que pide la consigna. Hace, en orden:
@@ -55,7 +55,7 @@ sqlc:
 # go.mod y genera/actualiza go.sum si hiciera falta.
 build:
 	@echo ">> Descargando dependencias y compilando..."
-	@$(COMPOSE) run --rm app sh -c "go mod tidy && go build ./..."
+	@$(COMPOSE) run --rm app sh -c "go mod tidy && go build -buildvcs=false ./..."
 
 # Levanta el contenedor de la base y espera a que su healthcheck pase
 # (ver "healthcheck" en docker-compose.yml). "--wait" es justamente la
