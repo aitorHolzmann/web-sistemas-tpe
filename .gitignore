@@ -1,1 +1,24 @@
-.devcontainer/
+.env
+
+# sqlc generated Go files. Keep db/sqlc/*_test.go tracked.
+/db/sqlc/db.go
+/db/sqlc/models.go
+/db/sqlc/querier.go
+/db/sqlc/querys.sql.go
+
+# Go build and test artifacts
+/bin/
+*.exe
+*.test
+*.out
+coverage.out
+
+# Editor and operating system files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Go workspace files
+go.work
+go.work.sum

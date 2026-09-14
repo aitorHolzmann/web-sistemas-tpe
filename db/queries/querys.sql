@@ -11,8 +11,8 @@ SELECT * FROM cliente WHERE id = $1;
 -- name: ListarClientes :many
 SELECT * FROM cliente ORDER BY apellido;
 
--- name: CambiarDireccion :exec
-UPDATE cliente SET direccion = $2 WHERE id = $1;
+-- name: ActualizarCliente :exec
+UPDATE cliente SET nombre = $2, apellido = $3, email = $4, direccion = $5 WHERE id = $1;
 
 -- name: BorrarCliente :exec
 DELETE FROM cliente WHERE id = $1;
@@ -30,17 +30,9 @@ SELECT * FROM producto WHERE id = $1;
 -- name: ListarProductos :many
 SELECT * FROM producto ORDER BY nombre;
 
--- name: CambiarPrecio :exec
-UPDATE producto SET precio = $2 WHERE id = $1;
-
--- name: GetStock :one
-SELECT stock FROM producto WHERE id = $1;
-
--- name: ActualizarStock :exec
-UPDATE producto SET stock = $2 WHERE id = $1;
-
--- name: ActualizarFoto :exec
-UPDATE producto SET foto = $2 WHERE id = $1;
+-- name: ActualizarProducto :one
+UPDATE producto SET nombre = $2, descripcion = $3, stock = $4, precio = $5, foto = $6, id_categoria = $7 WHERE id = $1
+RETURNING *;
 
 -- name: BorrarProducto :exec
 DELETE FROM producto WHERE id = $1;
@@ -49,12 +41,12 @@ DELETE FROM producto WHERE id = $1;
 ---------------------------------------------------------------------------------------------------------
 
 -- name: ListarCategorias :many
-SELECT id, nombre, descripcion FROM categoria ORDER BY nombre;
+SELECT * FROM categoria ORDER BY nombre;
 
 -- name: GetCategoria :one
-SELECT id, nombre, descripcion FROM categoria WHERE id = $1;
+SELECT * FROM categoria WHERE id = $1;
 
--- name: InsertarCategoria :one
+-- name: CrearCategoria :one
 INSERT INTO categoria (nombre, descripcion) VALUES ($1, $2) RETURNING *;
 
 -- name: ActualizarCategoria :exec
