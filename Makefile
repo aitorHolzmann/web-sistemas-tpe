@@ -1,8 +1,4 @@
-# ---------------------------------------------------------------------------
-# Makefile del TP2.
-# ---------------------------------------------------------------------------
-
-.PHONY: test sqlc build up down
+.PHONY: test sqlc build up down run api-test
 
 COMPOSE = docker compose -f .devcontainer/docker-compose.yml --env-file .env
 
@@ -31,3 +27,11 @@ up:
 down:
 	@echo ">> Bajando contenedores y borrando volúmenes..."
 	@$(COMPOSE) down -v --remove-orphans
+
+run: sqlc build up
+	@echo ">> Iniciando servidor en puerto 8080..."
+	@$(COMPOSE) run --rm --service-ports app go run main.go
+
+api-test:
+	@echo ">> Ejecutando pruebas de API..."
+	@./requests.sh

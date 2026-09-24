@@ -1,22 +1,571 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"log"
 	"net/http"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
+	db "tp2/db/sqlc"
+	"tp2/logic"
 )
 
-func main() {
-	dirPath := "./static"
-	server := http.FileServer(http.Dir(dirPath))
+type Server struct {
+	queries *db.Queries
+}
 
-	http.Handle("/", server)
+type CategoriaInput struct {
+	Nombre      string `json:"nombre"`
+	Descripcion string `json:"descripcion"`
+}
 
-	port := ":8080"
-	fmt.Printf("Servidor escuchand en http://localhost%s\n", port)
+type ProductoInput struct {
+	IDCategoria int32  `json:"id_categoria"`
+	Nombre      string `json:"nombre"`
+	Descripcion string `json:"descripcion"`
+	Stock       string `json:"stock"`
+	Precio      string `json:"precio"`
+	Foto        string `json:"foto"`
+}
 
-	err := http.ListenAndServe(port, nil)
-	if err != nil {
-		fmt.Printf("Error al iniciar el servidor: %s\n", err)
+type ClienteInput struct {
+	Nombre    string `json:"nombre"`
+	Apellido  string `json:"apellido"`
+	Email     string `json:"email"`
+	Direccion string `json:"direccion"`
+}
+
+func toNullString(s string) sql.NullString {
+	if strings.TrimSpace(s) == "" {
+		return sql.NullString{Valid: false}
+	}
+	return sql.NullString{String: s, Valid: true}
+}
+
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[%s] %s desde %s", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) categoriasHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/categorias")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		switch r.Method {
+		case http.MethodGet:
+			s.listCategorias(w, r)
+		case http.MethodPost:
+			s.createCategoria(w, r)
+		default:
+			http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+		}
+		return
 	}
 
+	if strings.Contains(path, "/") {
+		http.Error(w, "Ruta no encontrada", http.StatusNotFound)
+		return
+	}
+
+	id, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getCategoria(w, r, int32(id))
+	case http.MethodPut:
+		s.updateCategoria(w, r, int32(id))
+	case http.MethodDelete:
+		s.deleteCategoria(w, r, int32(id))
+	default:
+		http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) listCategorias(w http.ResponseWriter, r *http.Request) {
+	lista, err := s.queries.ListarCategorias(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lista == nil {
+		lista = []db.Categoria{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(lista)
+}
+
+func (s *Server) createCategoria(w http.ResponseWriter, r *http.Request) {
+	var in CategoriaInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateCategoria(in.Nombre); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	c, err := s.queries.CrearCategoria(r.Context(), db.CrearCategoriaParams{
+		Nombre:      in.Nombre,
+		Descripcion: toNullString(in.Descripcion),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) getCategoria(w http.ResponseWriter, r *http.Request, id int32) {
+	c, err := s.queries.GetCategoria(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Categoria no encontrada", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) updateCategoria(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetCategoria(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Categoria no encontrada", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var in CategoriaInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateCategoria(in.Nombre); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := s.queries.ActualizarCategoria(r.Context(), db.ActualizarCategoriaParams{
+		ID:          id,
+		Nombre:      in.Nombre,
+		Descripcion: toNullString(in.Descripcion),
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	c, err := s.queries.GetCategoria(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) deleteCategoria(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetCategoria(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Categoria no encontrada", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.queries.BorrarCategoria(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) productosHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/productos")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		switch r.Method {
+		case http.MethodGet:
+			s.listProductos(w, r)
+		case http.MethodPost:
+			s.createProducto(w, r)
+		default:
+			http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	if strings.Contains(path, "/") {
+		http.Error(w, "Ruta no encontrada", http.StatusNotFound)
+		return
+	}
+
+	id, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getProducto(w, r, int32(id))
+	case http.MethodPut:
+		s.updateProducto(w, r, int32(id))
+	case http.MethodDelete:
+		s.deleteProducto(w, r, int32(id))
+	default:
+		http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) listProductos(w http.ResponseWriter, r *http.Request) {
+	lista, err := s.queries.ListarProductos(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lista == nil {
+		lista = []db.Producto{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(lista)
+}
+
+func (s *Server) createProducto(w http.ResponseWriter, r *http.Request) {
+	var in ProductoInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateProducto(in.Nombre, in.Stock, in.Precio, in.IDCategoria); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.queries.GetCategoria(r.Context(), in.IDCategoria); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "La categoria especificada no existe", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	p, err := s.queries.CrearProducto(r.Context(), db.CrearProductoParams{
+		Nombre:      in.Nombre,
+		Descripcion: toNullString(in.Descripcion),
+		Stock:       in.Stock,
+		Precio:      in.Precio,
+		Foto:        toNullString(in.Foto),
+		IDCategoria: in.IDCategoria,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(p)
+}
+
+func (s *Server) getProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	p, err := s.queries.GetProducto(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Producto no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}
+
+func (s *Server) updateProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	var in ProductoInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateProducto(in.Nombre, in.Stock, in.Precio, in.IDCategoria); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.queries.GetCategoria(r.Context(), in.IDCategoria); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "La categoria especificada no existe", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	p, err := s.queries.ActualizarProducto(r.Context(), db.ActualizarProductoParams{
+		ID:          id,
+		Nombre:      in.Nombre,
+		Descripcion: toNullString(in.Descripcion),
+		Stock:       in.Stock,
+		Precio:      in.Precio,
+		Foto:        toNullString(in.Foto),
+		IDCategoria: in.IDCategoria,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Producto no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(p)
+}
+
+func (s *Server) deleteProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetProducto(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Producto no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.queries.BorrarProducto(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) clientesHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/clientes")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		switch r.Method {
+		case http.MethodGet:
+			s.listClientes(w, r)
+		case http.MethodPost:
+			s.createCliente(w, r)
+		default:
+			http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	if strings.Contains(path, "/") {
+		http.Error(w, "Ruta no encontrada", http.StatusNotFound)
+		return
+	}
+
+	id, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getCliente(w, r, int32(id))
+	case http.MethodPut:
+		s.updateCliente(w, r, int32(id))
+	case http.MethodDelete:
+		s.deleteCliente(w, r, int32(id))
+	default:
+		http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+	}
+}
+
+func (s *Server) listClientes(w http.ResponseWriter, r *http.Request) {
+	lista, err := s.queries.ListarClientes(r.Context())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if lista == nil {
+		lista = []db.Cliente{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(lista)
+}
+
+func (s *Server) createCliente(w http.ResponseWriter, r *http.Request) {
+	var in ClienteInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateCliente(in.Nombre, in.Apellido, in.Email, in.Direccion); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	c, err := s.queries.CrearCliente(r.Context(), db.CrearClienteParams{
+		Nombre:    in.Nombre,
+		Apellido:  in.Apellido,
+		Email:     in.Email,
+		Direccion: in.Direccion,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) getCliente(w http.ResponseWriter, r *http.Request, id int32) {
+	c, err := s.queries.GetCliente(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Cliente no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetCliente(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Cliente no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var in ClienteInput
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateCliente(in.Nombre, in.Apellido, in.Email, in.Direccion); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	err := s.queries.ActualizarCliente(r.Context(), db.ActualizarClienteParams{
+		ID:        id,
+		Nombre:    in.Nombre,
+		Apellido:  in.Apellido,
+		Email:     in.Email,
+		Direccion: in.Direccion,
+	})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	c, err := s.queries.GetCliente(r.Context(), id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(c)
+}
+
+func (s *Server) deleteCliente(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetCliente(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Cliente no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.queries.BorrarCliente(r.Context(), id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func main() {
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		log.Fatal("Falta la variable de entorno DATABASE_URL")
+	}
+
+	conn, err := sql.Open("pgx", dsn)
+	if err != nil {
+		log.Fatalf("No se pudo abrir la conexion: %v", err)
+	}
+	defer conn.Close()
+
+	var pingErr error
+	for i := 0; i < 30; i++ {
+		if pingErr = conn.Ping(); pingErr == nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if pingErr != nil {
+		log.Fatalf("No se pudo conectar a la base de datos tras varios intentos: %v", pingErr)
+	}
+
+	server := &Server{
+		queries: db.New(conn),
+	}
+
+	mux := http.NewServeMux()
+	mux.Handle("/categorias", loggingMiddleware(http.HandlerFunc(server.categoriasHandler)))
+	mux.Handle("/categorias/", loggingMiddleware(http.HandlerFunc(server.categoriasHandler)))
+	mux.Handle("/productos", loggingMiddleware(http.HandlerFunc(server.productosHandler)))
+	mux.Handle("/productos/", loggingMiddleware(http.HandlerFunc(server.productosHandler)))
+	mux.Handle("/clientes", loggingMiddleware(http.HandlerFunc(server.clientesHandler)))
+	mux.Handle("/clientes/", loggingMiddleware(http.HandlerFunc(server.clientesHandler)))
+	mux.Handle("/", loggingMiddleware(http.FileServer(http.Dir("./static"))))
+
+	port := ":8080"
+	log.Printf("Servidor escuchando en http://localhost%s\n", port)
+	if err := http.ListenAndServe(port, mux); err != nil {
+		log.Fatalf("Error al iniciar el servidor: %s", err)
+	}
 }
