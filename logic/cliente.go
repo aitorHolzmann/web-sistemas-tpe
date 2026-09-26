@@ -5,6 +5,13 @@ import (
 	"strings"
 )
 
+type ClienteInput struct {
+	Nombre    string `json:"nombre"`
+	Apellido  string `json:"apellido"`
+	Email     string `json:"email"`
+	Direccion string `json:"direccion"`
+}
+
 func ValidateCliente(nombre, apellido, email, direccion string) error {
 	if strings.TrimSpace(nombre) == "" {
 		return errors.New("el nombre no puede estar vacio")

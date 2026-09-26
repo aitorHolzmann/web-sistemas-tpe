@@ -20,26 +20,6 @@ type Server struct {
 	queries *db.Queries
 }
 
-type CategoriaInput struct {
-	Nombre      string `json:"nombre"`
-	Descripcion string `json:"descripcion"`
-}
-
-type ProductoInput struct {
-	IDCategoria int32  `json:"id_categoria"`
-	Nombre      string `json:"nombre"`
-	Descripcion string `json:"descripcion"`
-	Stock       string `json:"stock"`
-	Precio      string `json:"precio"`
-	Foto        string `json:"foto"`
-}
-
-type ClienteInput struct {
-	Nombre    string `json:"nombre"`
-	Apellido  string `json:"apellido"`
-	Email     string `json:"email"`
-	Direccion string `json:"direccion"`
-}
 
 func toNullString(s string) sql.NullString {
 	if strings.TrimSpace(s) == "" {

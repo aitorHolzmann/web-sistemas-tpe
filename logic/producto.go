@@ -6,6 +6,15 @@ import (
 	"strings"
 )
 
+type ProductoInput struct {
+	IDCategoria int32  `json:"id_categoria"`
+	Nombre      string `json:"nombre"`
+	Descripcion string `json:"descripcion"`
+	Stock       string `json:"stock"`
+	Precio      string `json:"precio"`
+	Foto        string `json:"foto"`
+}
+
 func ValidateProducto(nombre string, stock string, precio string, idCategoria int32) error {
 	if strings.TrimSpace(nombre) == "" {
 		return errors.New("el nombre no puede estar vacio")
@@ -23,3 +32,4 @@ func ValidateProducto(nombre string, stock string, precio string, idCategoria in
 	}
 	return nil
 }
+
