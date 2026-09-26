@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-type CategoriaInput struct {
+type Categoria struct {
 	Nombre      string `json:"nombre"`
 	Descripcion string `json:"descripcion"`
 }

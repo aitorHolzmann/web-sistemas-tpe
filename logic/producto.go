@@ -2,34 +2,33 @@ package logic
 
 import (
 	"errors"
-	"strconv"
+	"fmt"
 	"strings"
 )
 
-type ProductoInput struct {
-	IDCategoria int32  `json:"id_categoria"`
-	Nombre      string `json:"nombre"`
-	Descripcion string `json:"descripcion"`
-	Stock       string `json:"stock"`
-	Precio      string `json:"precio"`
-	Foto        string `json:"foto"`
+type Producto struct {
+	ID          int32   `json:"id"`
+	IDCategoria int32   `json:"id_categoria"`
+	Nombre      string  `json:"nombre"`
+	Descripcion string  `json:"descripcion"`
+	Stock       float64 `json:"stock"` // <- que sea float64
+	Precio      float64 `json:"precio"`
 }
 
-func ValidateProducto(nombre string, stock string, precio string, idCategoria int32) error {
-	if strings.TrimSpace(nombre) == "" {
+func ValidateProduct(p Producto) error {
+	if strings.TrimSpace(p.Nombre) == "" {
 		return errors.New("el nombre no puede estar vacio")
 	}
-	if idCategoria <= 0 {
-		return errors.New("la categoria es obligatoria")
+	if p.IDCategoria <= 0 {
+		return fmt.Errorf("la categoria es obligatoria")
 	}
-	s, err := strconv.ParseFloat(stock, 64)
-	if err != nil || s < 0 {
-		return errors.New("el stock debe ser un numero mayor o igual a cero")
+	if p.Stock < 0.0 {
+		return fmt.Errorf("el stock no puede ser menor a 0")
 	}
-	p, err := strconv.ParseFloat(precio, 64)
-	if err != nil || p <= 0 {
-		return errors.New("el precio debe ser mayor a cero")
+
+	if p.Precio <= 0 {
+		return fmt.Errorf("el precio debe ser mayor a cero")
 	}
+
 	return nil
 }
-

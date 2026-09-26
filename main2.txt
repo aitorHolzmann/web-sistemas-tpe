@@ -297,15 +297,6 @@ func (s *Server) getCliente(w http.ResponseWriter, r *http.Request, id int32) {
 }
 
 func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32) {
-	if _, err := s.queries.GetCliente(r.Context(), id); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			http.Error(w, "Cliente no encontrado", http.StatusNotFound)
-			return
-		}
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	var in ClienteInput
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		http.Error(w, "JSON invalido: "+err.Error(), http.StatusBadRequest)
@@ -317,7 +308,11 @@ func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32)
 		return
 	}
 
-	err := s.queries.ActualizarCliente(r.Context(), db.ActualizarClienteParams{
+	// Gracias a que la query SQL utiliza "RETURNING *" y directiva ":one",
+	// la base de datos devuelve la fila actualizada en la misma consulta.
+	// Si el id no existe, PostgreSQL no devuelve filas y sqlc genera sql.ErrNoRows,
+	// por lo que no es necesario hacer un Get previo ni posterior para validar y responder.
+	c, err := s.queries.ActualizarCliente(r.Context(), db.ActualizarClienteParams{
 		ID:        id,
 		Nombre:    in.Nombre,
 		Apellido:  in.Apellido,
@@ -325,12 +320,10 @@ func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32)
 		Direccion: in.Direccion,
 	})
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	c, err := s.queries.GetCliente(r.Context(), id)
-	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "Cliente no encontrado", http.StatusNotFound)
+			return
+		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}

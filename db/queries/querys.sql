@@ -11,8 +11,9 @@ SELECT * FROM cliente WHERE id = $1;
 -- name: ListarClientes :many
 SELECT * FROM cliente ORDER BY apellido;
 
--- name: ActualizarCliente :exec
-UPDATE cliente SET nombre = $2, apellido = $3, email = $4, direccion = $5 WHERE id = $1;
+-- name: ActualizarCliente :one
+UPDATE cliente SET nombre = $2, apellido = $3, email = $4, direccion = $5 WHERE id = $1
+RETURNING *;
 
 -- name: BorrarCliente :exec
 DELETE FROM cliente WHERE id = $1;
@@ -49,8 +50,9 @@ SELECT * FROM categoria WHERE id = $1;
 -- name: CrearCategoria :one
 INSERT INTO categoria (nombre, descripcion) VALUES ($1, $2) RETURNING *;
 
--- name: ActualizarCategoria :exec
-UPDATE categoria SET nombre = $1, descripcion = $2 WHERE id = $3;
+-- name: ActualizarCategoria :one
+UPDATE categoria SET nombre = $1, descripcion = $2 WHERE id = $3
+RETURNING *;
 
 -- name: BorrarCategoria :exec
 DELETE FROM categoria WHERE id = $1;
