@@ -15,6 +15,7 @@ type Producto struct {
 	Precio      float64 `json:"precio"`
 }
 
+// valida las reglas de negocio de un producto (nombre, categoria, stock y precio)
 func ValidateProduct(p Producto) error {
 	if strings.TrimSpace(p.Nombre) == "" {
 		return errors.New("el nombre no puede estar vacio")

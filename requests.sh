@@ -32,7 +32,7 @@ echo ""
 echo "=== 6. Crear Producto Valido (POST /productos) ==="
 PROD_RESP=$(curl -s -i -X POST "$BASE_URL/productos" \
   -H "Content-Type: application/json" \
-  -d "{\"nombre\": \"Teclado Mecanico\", \"descripcion\": \"RGB switch blue\", \"stock\": \"25\", \"precio\": \"18500.50\", \"foto\": \"https://example.com/teclado.jpg\", \"id_categoria\": $CAT_ID}")
+  -d "{\"nombre\": \"Teclado Mecanico\", \"descripcion\": \"RGB switch blue\", \"stock\": 25, \"precio\": 18500.50, \"id_categoria\": $CAT_ID}")
 echo "$PROD_RESP" | head -n 1
 PROD_ID=$(echo "$PROD_RESP" | grep -o '"id":[0-9]*' | head -n 1 | cut -d: -f2)
 echo "Producto creado con ID: $PROD_ID"
@@ -48,23 +48,23 @@ echo ""
 echo "=== 9. Actualizar Producto (PUT /productos/$PROD_ID) ==="
 curl -s -X PUT "$BASE_URL/productos/$PROD_ID" \
   -H "Content-Type: application/json" \
-  -d "{\"nombre\": \"Teclado Mecanico Pro\", \"descripcion\": \"RGB switch red silencioso\", \"stock\": \"10\", \"precio\": \"22000.00\", \"foto\": \"https://example.com/teclado_red.jpg\", \"id_categoria\": $CAT_ID}"
+  -d "{\"nombre\": \"Teclado Mecanico Pro\", \"descripcion\": \"RGB switch red silencioso\", \"stock\": 10, \"precio\": 22000.00, \"id_categoria\": $CAT_ID}"
 echo ""
 
 echo "=== 10. Validacion: POST /productos con nombre vacio (esperado: 400 Bad Request) ==="
 curl -s -i -X POST "$BASE_URL/productos" \
   -H "Content-Type: application/json" \
-  -d "{\"nombre\": \"\", \"stock\": \"5\", \"precio\": \"100\", \"id_categoria\": $CAT_ID}" | head -n 1
+  -d "{\"nombre\": \"\", \"stock\": 5, \"precio\": 100, \"id_categoria\": $CAT_ID}" | head -n 1
 
 echo "=== 11. Validacion: POST /productos con precio negativo (esperado: 400 Bad Request) ==="
 curl -s -i -X POST "$BASE_URL/productos" \
   -H "Content-Type: application/json" \
-  -d "{\"nombre\": \"Mouse\", \"stock\": \"5\", \"precio\": \"-100\", \"id_categoria\": $CAT_ID}" | head -n 1
+  -d "{\"nombre\": \"Mouse\", \"stock\": 5, \"precio\": -100, \"id_categoria\": $CAT_ID}" | head -n 1
 
 echo "=== 12. Validacion: POST /productos con categoria inexistente (esperado: 400 Bad Request) ==="
 curl -s -i -X POST "$BASE_URL/productos" \
   -H "Content-Type: application/json" \
-  -d '{"nombre": "Mouse", "stock": "5", "precio": "5000", "id_categoria": 99999}' | head -n 1
+  -d '{"nombre": "Mouse", "stock": 5, "precio": 5000, "id_categoria": 99999}' | head -n 1
 
 echo "=== 13. Buscar Producto Inexistente (esperado: 404 Not Found) ==="
 curl -s -i -X GET "$BASE_URL/productos/99999" | head -n 1
@@ -84,16 +84,26 @@ echo "=== 16. Listar Clientes (GET /clientes) ==="
 curl -s -X GET "$BASE_URL/clientes"
 echo ""
 
-echo "=== 17. Eliminar Producto (DELETE /productos/$PROD_ID) (esperado: 204 No Content) ==="
+echo "=== 17. Obtener Cliente por ID (GET /clientes/$CLI_ID) ==="
+curl -s -X GET "$BASE_URL/clientes/$CLI_ID"
+echo ""
+
+echo "=== 18. Actualizar Cliente (PUT /clientes/$CLI_ID) ==="
+curl -s -X PUT "$BASE_URL/clientes/$CLI_ID" \
+  -H "Content-Type: application/json" \
+  -d "{\"nombre\": \"Carlos Actualizado\", \"apellido\": \"Gomez\", \"email\": \"carlos.upd.$RANDOM@example.com\", \"direccion\": \"Av. Espana 500\"}"
+echo ""
+
+echo "=== 19. Eliminar Producto (DELETE /productos/$PROD_ID) (esperado: 204 No Content) ==="
 curl -s -i -X DELETE "$BASE_URL/productos/$PROD_ID" | head -n 1
 
-echo "=== 18. Verificar Producto Eliminado (GET /productos/$PROD_ID) (esperado: 404 Not Found) ==="
+echo "=== 20. Verificar Producto Eliminado (GET /productos/$PROD_ID) (esperado: 404 Not Found) ==="
 curl -s -i -X GET "$BASE_URL/productos/$PROD_ID" | head -n 1
 
-echo "=== 19. Eliminar Cliente (DELETE /clientes/$CLI_ID) (esperado: 204 No Content) ==="
+echo "=== 21. Eliminar Cliente (DELETE /clientes/$CLI_ID) (esperado: 204 No Content) ==="
 curl -s -i -X DELETE "$BASE_URL/clientes/$CLI_ID" | head -n 1
 
-echo "=== 20. Eliminar Categoria (DELETE /categorias/$CAT_ID) (esperado: 204 No Content) ==="
+echo "=== 22. Eliminar Categoria (DELETE /categorias/$CAT_ID) (esperado: 204 No Content) ==="
 curl -s -i -X DELETE "$BASE_URL/categorias/$CAT_ID" | head -n 1
 
 echo "=== Todas las pruebas completadas exitosamente ==="

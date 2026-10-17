@@ -62,7 +62,7 @@ func TestClienteCRUD(t *testing.T) {
 	t.Run("actualizar", func(t *testing.T) {
 		nuevoNombre := "Nicolas Actualizado"
 		nuevaDireccion := "Reforma Universitaria"
-		err := testQueries.ActualizarCliente(ctx, ActualizarClienteParams{
+		_, err := testQueries.ActualizarCliente(ctx, ActualizarClienteParams{
 			ID:        cliente.ID,
 			Nombre:    nuevoNombre,
 			Apellido:  cliente.Apellido,

@@ -21,6 +21,7 @@ type Server struct {
 	queries *db.Queries
 }
 
+// inicia la conexion a la base de datos, configura las rutas y levanta el servidor http
 func main() {
 
 	// Creamos la conexion con la base de datos
@@ -47,39 +48,40 @@ func main() {
 		log.Fatalf("No se pudo conectar a la base de datos tras varios intentos: %v", pingErr)
 	}
 
-	//
-
 	server := &Server{
 		queries: db.New(conn),
 	}
-	_ = server
 	log.Println("Conectado a la base de datos correctamente")
-	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	/*====================================
 	END-POINTS
 	=====================================*/
-	/*
-		mux := http.NewServeMux()
-		mux.Handle("/categorias", http.HandlerFunc(server.categoriasHandler))
-		mux.Handle("/categorias/", http.HandlerFunc(server.categoriasHandler))
-		mux.Handle("/productos", http.HandlerFunc(server.productosHandler))
-		mux.Handle("/productos/", http.HandlerFunc(server.productosHandler))
-		//para clientes tengo en cuenta clientes y clientes/ por si piden listar clientes o si piden algo especifico clientes/...
-		mux.Handle("/clientes", http.HandlerFunc(server.clientesHandler))
-		mux.Handle("/clientes/",http.HandlerFunc(server.clientesHandler))
-		mux.Handle("/", http.FileServer(http.Dir("./static")))
+	mux := http.NewServeMux()
+	mux.Handle("/categorias", loggingMiddleware(http.HandlerFunc(server.categoriasHandler)))
+	mux.Handle("/categorias/", loggingMiddleware(http.HandlerFunc(server.categoriasHandler)))
+	mux.Handle("/productos", loggingMiddleware(http.HandlerFunc(server.productosHandler)))
+	mux.Handle("/productos/", loggingMiddleware(http.HandlerFunc(server.productosHandler)))
+	//para clientes tengo en cuenta clientes y clientes/ por si piden listar clientes o si piden algo especifico clientes/...
+	mux.Handle("/clientes", loggingMiddleware(http.HandlerFunc(server.clientesHandler)))
+	mux.Handle("/clientes/", loggingMiddleware(http.HandlerFunc(server.clientesHandler)))
+	mux.Handle("/", loggingMiddleware(http.FileServer(http.Dir("./static"))))
 
-		port := ":8080"
-		log.Printf("Servidor escuchando en http://localhost%s\n", port)
-		if err := http.ListenAndServe(port, mux); err != nil {
-			log.Fatalf("Error al iniciar el servidor: %s", err)
-		}
-	*/
+	port := ":8080"
+	log.Printf("Servidor escuchando en http://localhost%s\n", port)
+	if err := http.ListenAndServe(port, mux); err != nil {
+		log.Fatalf("Error al iniciar el servidor: %s", err)
+	}
 }
 
-//Como en la db tenemos atributos que pueden ser null, de esta forma puedo resolverlo para strings
+// registra en consola el metodo, la ruta y la ip de cada peticion antes de pasarla al handler
+func loggingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("[%s] %s desde %s", r.Method, r.URL.Path, r.RemoteAddr)
+		next.ServeHTTP(w, r)
+	})
+}
 
+// como en la db tenemos atributos que pueden ser null, de esta forma puedo resolverlo para strings
 func toNullString(s string) sql.NullString {
 	if strings.TrimSpace(s) == "" {
 		return sql.NullString{}
@@ -91,6 +93,7 @@ func toNullString(s string) sql.NullString {
 // CLIENTE
 // -----------------------------------------------------------------------------------------------
 
+// analiza la ruta de clientes y deriva la peticion segun el metodo http y si tiene id
 func (s *Server) clientesHandler(w http.ResponseWriter, r *http.Request) {
 	// quitamos el prefijo "/clientes" y las barras sobrantes
 	path := strings.TrimPrefix(r.URL.Path, "/clientes")
@@ -135,6 +138,7 @@ func (s *Server) clientesHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// decodifica un cliente del json, lo valida y lo guarda en la base de datos
 func (s *Server) createCliente(w http.ResponseWriter, r *http.Request) {
 	// decodificar el JSON del cuerpo de la petición
 	var in logic.Cliente
@@ -167,6 +171,7 @@ func (s *Server) createCliente(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(c)
 }
 
+// obtiene todos los clientes de la base de datos y los devuelve como array json
 func (s *Server) listClientes(w http.ResponseWriter, r *http.Request) {
 	//r.context permite al ususario cancelar la peticion o si se corta la conexion amitad de camino, el contexto se cancela y postgreSQL corta la consulta sin desperdiciar recursos
 	lista, err := s.queries.ListarClientes(r.Context())
@@ -183,6 +188,7 @@ func (s *Server) listClientes(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(lista)
 }
 
+// busca un cliente por su id y devuelve 404 si no existe
 func (s *Server) getCliente(w http.ResponseWriter, r *http.Request, id int32) {
 	c, err := s.queries.GetCliente(r.Context(), id)
 	if err != nil {
@@ -199,6 +205,8 @@ func (s *Server) getCliente(w http.ResponseWriter, r *http.Request, id int32) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(c)
 }
+
+// valida los nuevos datos y actualiza un cliente existente por su id
 func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32) {
 	// verificar si el cliente existe antes de actualizar
 	if _, err := s.queries.GetCliente(r.Context(), id); err != nil {
@@ -241,6 +249,7 @@ func (s *Server) updateCliente(w http.ResponseWriter, r *http.Request, id int32)
 	json.NewEncoder(w).Encode(c)
 }
 
+// verifica que el cliente exista, lo elimina por id y devuelve 204 sin contenido
 func (s *Server) deleteCliente(w http.ResponseWriter, r *http.Request, id int32) {
 	// verificar si el cliente existe
 	if _, err := s.queries.GetCliente(r.Context(), id); err != nil {
@@ -266,6 +275,7 @@ func (s *Server) deleteCliente(w http.ResponseWriter, r *http.Request, id int32)
 // CATEGORIAS
 // -----------------------------------------------------------------------------------------------
 
+// analiza la ruta de categorias y deriva la peticion segun el metodo http y si tiene id
 func (s *Server) categoriasHandler(w http.ResponseWriter, r *http.Request) {
 	/*
 		Si llega /categorias/id/
@@ -317,6 +327,7 @@ func (s *Server) categoriasHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// obtiene todas las categorias de la base de datos y las devuelve como array json
 func (s *Server) listCategorias(w http.ResponseWriter, r *http.Request) {
 	lista, err := s.queries.ListarCategorias(r.Context())
 	if err != nil {
@@ -334,6 +345,7 @@ func (s *Server) listCategorias(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(lista)
 }
 
+// decodifica una categoria del json, la valida y la inserta en la base de datos
 func (s *Server) createCategoria(w http.ResponseWriter, r *http.Request) {
 	var categoria logic.Categoria
 	if err := json.NewDecoder(r.Body).Decode(&categoria); err != nil {
@@ -360,6 +372,7 @@ func (s *Server) createCategoria(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(nueva_categoria)
 }
 
+// busca una categoria por su id y devuelve 404 si no existe
 func (s *Server) getCategoria(w http.ResponseWriter, r *http.Request, id int32) {
 	categoria, err := s.queries.GetCategoria(r.Context(), id)
 	if err != nil {
@@ -375,6 +388,7 @@ func (s *Server) getCategoria(w http.ResponseWriter, r *http.Request, id int32) 
 	json.NewEncoder(w).Encode(categoria)
 }
 
+// valida los datos recibidos y actualiza una categoria por su id
 func (s *Server) updateCategoria(w http.ResponseWriter, r *http.Request, id int32) {
 	var categoria logic.Categoria
 	if err := json.NewDecoder(r.Body).Decode(&categoria); err != nil {
@@ -407,6 +421,7 @@ func (s *Server) updateCategoria(w http.ResponseWriter, r *http.Request, id int3
 	json.NewEncoder(w).Encode(nueva_categoria)
 }
 
+// verifica que la categoria exista, la elimina de la base de datos y responde 204
 func (s *Server) deleteCategoria(w http.ResponseWriter, r *http.Request, id int32) {
 	if _, err := s.queries.GetCategoria(r.Context(), id); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -452,6 +467,47 @@ func aLogic(p db.Producto) (logic.Producto, error) {
 	}, nil
 }
 
+// analiza la ruta de productos y deriva la peticion segun el metodo http y si tiene id
+func (s *Server) productosHandler(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/productos")
+	path = strings.Trim(path, "/")
+
+	if path == "" {
+		switch r.Method {
+		case http.MethodGet:
+			s.listarProductos(w, r)
+		case http.MethodPost:
+			s.crearProducto(w, r)
+		default:
+			http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	if strings.Contains(path, "/") {
+		http.Error(w, "Ruta no encontrada", http.StatusNotFound)
+		return
+	}
+
+	id, err := strconv.Atoi(path)
+	if err != nil {
+		http.Error(w, "ID invalido", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		s.getProducto(w, r, int32(id))
+	case http.MethodPut:
+		s.updateProducto(w, r, int32(id))
+	case http.MethodDelete:
+		s.deleteProducto(w, r, int32(id))
+	default:
+		http.Error(w, "Metodo no permitido", http.StatusMethodNotAllowed)
+	}
+}
+
+// decodifica un producto del json, valida que exista su categoria y lo guarda en la db
 func (s *Server) crearProducto(w http.ResponseWriter, r *http.Request) {
 	var p logic.Producto
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
@@ -464,9 +520,18 @@ func (s *Server) crearProducto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if _, err := s.queries.GetCategoria(r.Context(), p.IDCategoria); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "la categoria especificada no existe", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+
 	creado, err := s.queries.CrearProducto(r.Context(), db.CrearProductoParams{
 		Nombre:      p.Nombre,
-		Descripcion: sql.NullString{String: p.Descripcion, Valid: p.Descripcion != ""},
+		Descripcion: toNullString(p.Descripcion),
 		Stock:       strconv.FormatFloat(p.Stock, 'f', 2, 64),
 		Precio:      strconv.FormatFloat(p.Precio, 'f', 2, 64),
 		Foto:        sql.NullString{Valid: false},
@@ -488,15 +553,9 @@ func (s *Server) crearProducto(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-func (s *Server) getProducto(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		http.Error(w, "el id debe ser un número", http.StatusBadRequest)
-		return
-	}
-
-	obtenido, err := s.queries.GetProducto(r.Context(), int32(id))
+// busca un producto por su id, lo traduce a la capa de logica y devuelve 404 si no existe
+func (s *Server) getProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	obtenido, err := s.queries.GetProducto(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			http.Error(w, "producto no encontrado", http.StatusNotFound)
@@ -516,6 +575,7 @@ func (s *Server) getProducto(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
+// obtiene todos los productos de la db, los traduce a logica y los devuelve como array json
 func (s *Server) listarProductos(w http.ResponseWriter, r *http.Request) {
 	lista, err := s.queries.ListarProductos(r.Context())
 	if err != nil {
@@ -535,4 +595,73 @@ func (s *Server) listarProductos(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(productos)
+}
+
+// valida los nuevos datos de un producto y lo actualiza en la base de datos por su id
+func (s *Server) updateProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	var p logic.Producto
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		http.Error(w, "no se pudo interpretar el JSON recibido", http.StatusBadRequest)
+		return
+	}
+
+	if err := logic.ValidateProduct(p); err != nil {
+		http.Error(w, "No se pudo validar el producto", http.StatusBadRequest)
+		return
+	}
+
+	if _, err := s.queries.GetCategoria(r.Context(), p.IDCategoria); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "la categoria especificada no existe", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+
+	actualizado, err := s.queries.ActualizarProducto(r.Context(), db.ActualizarProductoParams{
+		ID:          id,
+		Nombre:      p.Nombre,
+		Descripcion: toNullString(p.Descripcion),
+		Stock:       strconv.FormatFloat(p.Stock, 'f', 2, 64),
+		Precio:      strconv.FormatFloat(p.Precio, 'f', 2, 64),
+		Foto:        sql.NullString{Valid: false},
+		IDCategoria: p.IDCategoria,
+	})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "producto no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "no se pudo actualizar el producto", http.StatusInternalServerError)
+		return
+	}
+
+	resp, err := aLogic(actualizado)
+	if err != nil {
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// verifica que el producto exista, lo elimina por su id y responde 204 sin contenido
+func (s *Server) deleteProducto(w http.ResponseWriter, r *http.Request, id int32) {
+	if _, err := s.queries.GetProducto(r.Context(), id); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			http.Error(w, "producto no encontrado", http.StatusNotFound)
+			return
+		}
+		http.Error(w, "error interno", http.StatusInternalServerError)
+		return
+	}
+
+	if err := s.queries.BorrarProducto(r.Context(), id); err != nil {
+		http.Error(w, "no se pudo eliminar el producto", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -12,6 +12,7 @@ type Cliente struct {
 	Direccion string `json:"direccion"`
 }
 
+// valida que los datos del cliente no esten vacios y el email tenga @
 func ValidateCliente(nombre, apellido, email, direccion string) error {
 	if strings.TrimSpace(nombre) == "" {
 		return errors.New("el nombre no puede estar vacio")

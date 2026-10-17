@@ -58,7 +58,7 @@ func TestCategoriaCRUD(t *testing.T) {
 
 	t.Run("actualizar", func(t *testing.T) {
 		nuevoNombre := nombre + " editada"
-		err := testQueries.ActualizarCategoria(ctx, ActualizarCategoriaParams{
+		_, err := testQueries.ActualizarCategoria(ctx, ActualizarCategoriaParams{
 			ID:          categoria.ID,
 			Nombre:      nuevoNombre,
 			Descripcion: sql.NullString{String: "descripcion editada", Valid: true},
