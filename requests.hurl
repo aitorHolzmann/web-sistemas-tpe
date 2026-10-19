@@ -15,6 +15,7 @@ cat_id: jsonpath "$.id"
 [Asserts]
 jsonpath "$.id" exists
 jsonpath "$.nombre" == "Perifericos Hurl"
+jsonpath "$.descripcion" == "Categoria creada desde Hurl"
 
 # listar categorias
 GET http://localhost:8080/categorias
@@ -40,6 +41,7 @@ HTTP 200
 [Asserts]
 jsonpath "$.id" == {{cat_id}}
 jsonpath "$.nombre" == "Perifericos y Accesorios"
+jsonpath "$.descripcion" == "Categoria actualizada desde Hurl"
 
 # validacion: categoria con nombre vacio (400 Bad Request)
 POST http://localhost:8080/categorias

@@ -6,6 +6,7 @@ import (
 )
 
 type Categoria struct {
+	ID          int32  `json:"id"`
 	Nombre      string `json:"nombre"`
 	Descripcion string `json:"descripcion"`
 }

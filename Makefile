@@ -1,37 +1,31 @@
-.PHONY: test sqlc build up down run api-test
+.PHONY: run api-test test down
 
 COMPOSE = docker compose -f .devcontainer/docker-compose.yml --env-file .env
 
-test: sqlc build down up
-	@echo ""
-	@echo ">> Corriendo tests..."
-	@$(COMPOSE) run --rm app go test ./... -v; \
+# levanta los contenedores, genera el codigo de sqlc e inicia el servidor en el puerto 8080
+run:
+	@echo ">> Levantando contenedores (base de datos y app)..."
+	@$(COMPOSE) up -d --build --wait
+	@echo ">> Generando código con sqlc..."
+	@$(COMPOSE) exec app sqlc generate
+	@echo ">> Iniciando servidor en http://localhost:8080 ..."
+	@$(COMPOSE) exec app go run main.go
+
+# ejecuta las pruebas de la API con hurl (el servidor tiene que estar corriendo)
+api-test:
+	@echo ">> Ejecutando pruebas de API..."
+	@$(COMPOSE) exec app hurl --test requests.hurl
+
+# corre los tests de la capa de datos (sqlc) sobre una base de datos limpia
+test: down
+	@$(COMPOSE) up -d --build --wait
+	@$(COMPOSE) exec app sqlc generate
+	@$(COMPOSE) exec app go test ./... -v; \
 	TEST_EXIT=$$?; \
-	echo ""; \
-	echo ">> Bajando contenedores y volúmenes..."; \
 	$(COMPOSE) down -v; \
 	exit $$TEST_EXIT
 
-sqlc:
-	@echo ">> Generando código con sqlc..."
-	@$(COMPOSE) run --rm app sqlc generate
-
-build:
-	@echo ">> Descargando dependencias y compilando..."
-	@$(COMPOSE) run --rm app sh -c "go mod tidy && go build -buildvcs=false ./..."
-
-up:
-	@echo ">> Levantando la base de datos..."
-	@$(COMPOSE) up -d --wait db
-
+# baja los contenedores y borra los datos de la base
 down:
 	@echo ">> Bajando contenedores y borrando volúmenes..."
 	@$(COMPOSE) down -v --remove-orphans
-
-run: sqlc build up
-	@echo ">> Iniciando servidor en puerto 8080..."
-	@$(COMPOSE) run --rm --service-ports app go run main.go
-
-api-test:
-	@echo ">> Ejecutando pruebas de API..."
-	@./requests.sh
