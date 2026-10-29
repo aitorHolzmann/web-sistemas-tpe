@@ -57,6 +57,10 @@ func main() {
 	mux.HandleFunc("/clientes", server.clientesHandler)
 	mux.HandleFunc("/clientes/", server.clientesHandler)
 
+	// Servidor de archivos estaticos para la interfaz web (carpeta ./static)
+	fileServer := http.FileServer(http.Dir("./static"))
+	mux.Handle("/", fileServer)
+
 	port := ":8080"
 	log.Printf("Servidor escuchando en http://localhost%s\n", port)
 	if err := http.ListenAndServe(port, mux); err != nil {
