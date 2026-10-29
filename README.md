@@ -1,7 +1,16 @@
-# Trabajo de Cursada - TP3: Exponiendo la Lógica como API
+# Trabajo de Cursada - TP4: La Capa de Presentación
 
-API REST de **MarkeTandil** para gestionar **categorías**, **productos** y **clientes**.
+API REST y Frontend de **MarkeTandil** para gestionar **categorías**, **productos** y **clientes**.
 
+## Interfaz Web (TP4)
+
+Al iniciar el servidor con `make run`, abrir en el navegador:
+
+👉 **http://localhost:8080**
+
+Permite visualizar la lista de productos de forma dinámica, dar de alta nuevos productos y eliminarlos consumiendo la API REST con Vanilla JavaScript (`fetch`, manipulación del DOM y delegación de eventos).
+
+Para el detalle de requerimientos y defensa ante la cátedra, consultar [DEFENSA_TP4.md](DEFENSA_TP4.md).
 
 ## Requisitos
 

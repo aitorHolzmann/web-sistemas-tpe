@@ -1,21 +1,73 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="es">
 <head>
-  <title>Inicio</title>
+  <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MarkeTandil - Gestión de Productos</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
 
-  <header>
+  <header class="encabezado">
     <h1>MarkeTandil</h1>
+    <p>Panel de Gestión de Productos - Capa de Presentación (TP4)</p>
   </header>
 
-  <main>
-    <h1>Bienvenido al sitio de los mejores precios</h1>
-    <p>En esta pagina podes encontrar productos para comprar. </p>
-  </main>
-</body>
+  <main class="contenedor-principal">
+    
+    <!-- Formulario para crear un nuevo producto -->
+    <section class="seccion-formulario">
+      <h2>Nuevo Producto</h2>
+      
+      <form id="form-producto">
+        <div class="campo">
+          <label for="nombre">Nombre (*):</label>
+          <input type="text" id="nombre" name="nombre" placeholder="Ej: Yerba Mate 1kg" required>
+        </div>
 
+        <div class="campo">
+          <label for="descripcion">Descripción:</label>
+          <input type="text" id="descripcion" name="descripcion" placeholder="Ej: Con palo, paquete de 1kg">
+        </div>
+
+        <div class="campo">
+          <label for="precio">Precio ($) (*):</label>
+          <input type="number" id="precio" name="precio" step="0.01" min="0.01" placeholder="Ej: 2450.50" required>
+        </div>
+
+        <div class="campo">
+          <label for="stock">Stock (*):</label>
+          <input type="number" id="stock" name="stock" step="1" min="0" placeholder="Ej: 15" required>
+        </div>
+
+        <div class="campo">
+          <label for="id_categoria">ID Categoría (*):</label>
+          <input type="number" id="id_categoria" name="id_categoria" min="1" value="1" required>
+        </div>
+
+        <button type="submit" id="btn-crear" class="btn-primario">Crear Producto</button>
+      </form>
+
+      <!-- Mensaje de estado/error para dar feedback visual al usuario -->
+      <div id="mensaje-estado" class="mensaje-oculto"></div>
+    </section>
+
+    <!-- Contenedor donde se listarán las entidades dinámicamente -->
+    <section class="seccion-listado">
+      <div class="encabezado-listado">
+        <h2>Listado de Productos</h2>
+        <button id="btn-refrescar" class="btn-secundario" type="button">Actualizar</button>
+      </div>
+
+      <!-- El ID pedido por la consigna para manipularlo con JavaScript -->
+      <ul id="lista-productos" class="lista-productos">
+        <!-- Elementos <li> generados por JS -->
+      </ul>
+    </section>
+
+  </main>
+
+  <!-- Enlace al script JS -->
+  <script src="app.js"></script>
+</body>
 </html>
