@@ -1,0 +1,70 @@
+package views
+
+import (
+	"fmt"
+	db "tpe/db/sqlc"
+)
+
+templ EntityList(productos []db.Producto, categoriasMap map[int32]string) {
+	<section class="seccion-listado" aria-labelledby="list-heading">
+		<div class="encabezado-listado">
+			<h2 id="list-heading">Listado de Productos</h2>
+			<small style="color: #64748b;">{ fmt.Sprintf("%d producto(s) en total", len(productos)) }</small>
+		</div>
+
+		if len(productos) == 0 {
+			<p class="vacio">No hay productos registrados actualmente.</p>
+		} else {
+			<div class="overflow-auto" style="overflow-x: auto;">
+				<table class="striped" id="tabla-productos" style="width: 100%; border-collapse: collapse;">
+					<thead>
+						<tr>
+							<th scope="col">ID</th>
+							<th scope="col">Nombre</th>
+							<th scope="col">Categoría</th>
+							<th scope="col">Descripción</th>
+							<th scope="col">Precio</th>
+							<th scope="col">Stock</th>
+							<th scope="col" style="text-align: right;">Acciones</th>
+						</tr>
+					</thead>
+					<tbody>
+						for _, p := range productos {
+							<tr>
+								<th scope="row">{ fmt.Sprintf("#%d", p.ID) }</th>
+								<td><strong>{ p.Nombre }</strong></td>
+								<td>
+									if catNombre, ok := categoriasMap[p.IDCategoria]; ok {
+										<span class="categoria-producto">{ catNombre }</span>
+									} else {
+										<span class="categoria-producto">{ fmt.Sprintf("Cat. #%d", p.IDCategoria) }</span>
+									}
+								</td>
+								<td>
+									if p.Descripcion.Valid && p.Descripcion.String != "" {
+										{ p.Descripcion.String }
+									} else {
+										<small style="color: #94a3b8;"><em>Sin descripción</em></small>
+									}
+								</td>
+								<td><strong style="color: #15803d;">{ "$" + p.Precio }</strong></td>
+								<td>{ p.Stock }</td>
+								<td style="text-align: right;">
+									<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/productos/%d/eliminar", p.ID)) } style="margin: 0; display: inline-block;">
+										<button
+											type="submit"
+											class="btn-eliminar"
+											onclick="return confirm('¿Estás seguro de que deseas eliminar este producto?');"
+										>
+											Eliminar
+										</button>
+									</form>
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		}
+	</section>
+}

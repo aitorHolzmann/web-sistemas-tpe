@@ -1,0 +1,26 @@
+package views
+
+import (
+	db "tpe/db/sqlc"
+)
+
+templ IndexPage(productos []db.Producto, categorias []db.Categoria, categoriasMap map[int32]string, errorMsg string, successMsg string) {
+	@Layout("MarkeTandil - Gestión de Productos") {
+		if errorMsg != "" {
+			<div class="mensaje error" role="alert">
+				<strong>Error: </strong> { errorMsg }
+			</div>
+		}
+
+		if successMsg != "" {
+			<div class="mensaje exito" role="status">
+				{ successMsg }
+			</div>
+		}
+
+		<div class="contenedor-principal">
+			@EntityForm(categorias)
+			@EntityList(productos, categoriasMap)
+		</div>
+	}
+}

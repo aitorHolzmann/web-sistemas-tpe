@@ -1,0 +1,48 @@
+package views
+
+import (
+	"fmt"
+	db "tpe/db/sqlc"
+)
+
+templ EntityForm(categorias []db.Categoria) {
+	<section class="seccion-formulario" aria-labelledby="form-heading">
+		<h2 id="form-heading">Nuevo Producto</h2>
+		<form method="POST" action="/productos" id="form-producto">
+			<div class="campo">
+				<label for="nombre">Nombre (*):</label>
+				<input type="text" id="nombre" name="nombre" placeholder="Ej: Yerba Mate 1kg" required/>
+			</div>
+
+			<div class="campo">
+				<label for="id_categoria">Categoría (*):</label>
+				<select id="id_categoria" name="id_categoria" required>
+					if len(categorias) == 0 {
+						<option value="1">Categoría General (1)</option>
+					} else {
+						for _, c := range categorias {
+							<option value={ fmt.Sprintf("%d", c.ID) }>{ c.Nombre }</option>
+						}
+					}
+				</select>
+			</div>
+
+			<div class="campo">
+				<label for="descripcion">Descripción:</label>
+				<input type="text" id="descripcion" name="descripcion" placeholder="Ej: Paquete de 1kg con palo"/>
+			</div>
+
+			<div class="campo">
+				<label for="precio">Precio ($) (*):</label>
+				<input type="number" id="precio" name="precio" step="0.01" min="0.01" placeholder="Ej: 2450.50" required/>
+			</div>
+
+			<div class="campo">
+				<label for="stock">Stock (*):</label>
+				<input type="number" id="stock" name="stock" step="1" min="0" placeholder="Ej: 15" required/>
+			</div>
+
+			<button type="submit" class="btn-primario" id="btn-crear">Crear Producto</button>
+		</form>
+	</section>
+}
