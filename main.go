@@ -47,34 +47,25 @@ func main() {
 	}
 	log.Println("Conectado a la base de datos correctamente")
 
-	// Sembrado preventivo de categorías para asegurar integridad referencial
+	// crea categorías iniciales si la tabla está vacía
 	ctx := context.Background()
 	if err := server.asegurarCategoriasIniciales(ctx); err != nil {
 		log.Printf("Advertencia al verificar categorías iniciales: %v\n", err)
 	}
 
-	/*=============================================================================
-	  RUTAS DE PRESENTACIÓN - SERVER-SIDE RENDERING CON TEMPL (TP5)
-	  Siguiendo filmina 19 de 09-view-static.pdf y consigna TP5:
-	  - Se abandonan los endpoints de API que devuelven JSON.
-	  - GET / renderiza la página completa con Templ.
-	  - POST /productos gestiona el formulario clásico con patrón PRG (HTTP 303).
-	  - POST /productos/{id}/eliminar gestiona el borrado con patrón PRG (HTTP 303).
-	  - /static/ sirve hojas de estilo y recursos estáticos mediante http.FileServer.
-	=============================================================================*/
 	mux := http.NewServeMux()
 
-	// 1. Servidor de archivos estáticos (/static/styles.css, etc.)
+	// archivos estáticos: css, imágenes, etc.
 	fileServer := http.FileServer(http.Dir("./static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fileServer))
 
-	// 2. Página principal con Server-Side Rendering
+	// página principal renderizada con Templ
 	mux.HandleFunc("/", server.handleIndex)
 
-	// 3. Manejo de formulario de alta (patrón PRG)
+	// formulario de alta de producto
 	mux.HandleFunc("/productos", server.handleProductos)
 
-	// 4. Manejo de borrado (patrón PRG)
+	// acciones sobre un producto (eliminar)
 	mux.HandleFunc("/productos/", server.handleProductoAcciones)
 
 	port := ":8080"
@@ -115,10 +106,7 @@ func (s *Server) asegurarCategoriasIniciales(ctx context.Context) error {
 // HANDLERS SSR Y PATRÓN POST / REDIRECT / GET (PRG)
 // -----------------------------------------------------------------------------------------------
 
-// handleIndex atiende GET /:
-// - Consulta los productos y categorías usando sqlc.
-// - Construye el mapa de nombres de categorías.
-// - Renderiza el componente IndexPage (que usa layout.templ, entity_form.templ y entity_list.templ).
+// handleIndex muestra la página principal con la lista de productos y el formulario de alta
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -154,7 +142,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		catMap[c.ID] = c.Nombre
 	}
 
-	// Mensajes de retroalimentación transferidos mediante query params por el patrón PRG
+	// mensajes de feedback pasados por query params
 	errorMsg := r.URL.Query().Get("error")
 	successMsg := r.URL.Query().Get("success")
 
@@ -177,11 +165,7 @@ func (s *Server) handleProductos(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// crearProductoForm implementa el patrón Post/Redirect/Get (PRG):
-// 1. Parsea los datos del formulario (application/x-www-form-urlencoded).
-// 2. Valida tipos y reglas de negocio con la capa pura `logic.ValidateProduct`.
-// 3. Persiste en la base de datos usando sqlc (`queries.CrearProducto`).
-// 4. Redirige a GET / con código 303 (See Other) para actualizar la vista sin riesgo de reenvío.
+// crearProductoForm procesa el formulario de alta y redirige al inicio (patrón PRG)
 func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		redireccionarConError(w, r, "Datos de formulario inválidos")
@@ -213,7 +197,7 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar con la capa de lógica del negocio pura (Three-Tier Architecture)
+	// valida las reglas de negocio antes de persistir
 	prodLogic := logic.Producto{
 		Nombre:      nombre,
 		Descripcion: descripcion,
@@ -226,7 +210,7 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verificar existencia de la categoría en la base de datos
+	// verifica que la categoría exista en la base de datos
 	ctx := r.Context()
 	if _, err := s.queries.GetCategoria(ctx, int32(idCategoria)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
@@ -258,12 +242,12 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Patrón PRG: Redirección con HTTP 303 See Other
+	// redirige con mensaje de éxito
 	msg := fmt.Sprintf("Producto '%s' creado exitosamente", nombre)
 	http.Redirect(w, r, "/?success="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
-// handleProductoAcciones atiende rutas como POST /productos/{id}/eliminar o POST /productos/eliminar
+// handleProductoAcciones maneja acciones sobre un producto específico (eliminar)
 func (s *Server) handleProductoAcciones(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -311,12 +295,12 @@ func (s *Server) handleProductoAcciones(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Patrón PRG tras eliminación
+	// redirige con mensaje de éxito tras eliminar
 	msg := fmt.Sprintf("Producto '%s' (#%d) eliminado correctamente", prod.Nombre, id)
 	http.Redirect(w, r, "/?success="+url.QueryEscape(msg), http.StatusSeeOther)
 }
 
-// redireccionarConError redirige al usuario a la página principal con el mensaje de error escapado
+// redireccionarConError redirige al inicio con un mensaje de error en query param
 func redireccionarConError(w http.ResponseWriter, r *http.Request, msg string) {
 	http.Redirect(w, r, "/?error="+url.QueryEscape(msg), http.StatusSeeOther)
 }
