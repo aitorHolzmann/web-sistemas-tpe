@@ -6,9 +6,9 @@ import (
 )
 
 templ EntityForm(categorias []db.Categoria) {
-	<section class="seccion-formulario" aria-labelledby="form-heading">
+	<section id="seccion-formulario" class="seccion-formulario" aria-labelledby="form-heading">
 		<h2 id="form-heading">Nuevo Producto</h2>
-		<form method="POST" action="/productos" id="form-producto">
+		<form id="form-producto" hx-post="/productos" hx-target="#lista-productos" hx-swap="outerHTML">
 			<div class="campo">
 				<label for="nombre">Nombre (*):</label>
 				<input type="text" id="nombre" name="nombre" placeholder="Ej: Yerba Mate 1kg" required/>

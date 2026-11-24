@@ -2,26 +2,26 @@
 
 COMPOSE = docker compose -f .devcontainer/docker-compose.yml --env-file .env
 
-# Script completo exigido por las consideraciones de entrega (tareas previas, ejecución y limpieza posterior)
+# ejecuta tareas previas, levanta la aplicacion y limpia al finalizar
 run-app:
 	@chmod +x ./run-app.sh
 	@./run-app.sh
 
-# Inicia la aplicación ejecutando las tareas previas, levantando el servidor y limpiando al finalizar
+# alias de run-app
 run: run-app
 
-# Compila el acceso a datos (sqlc) y los componentes de vista (templ)
+# compila el acceso a datos (sqlc) y las vistas (templ)
 generate:
-	@echo ">> Generando código con sqlc y vistas con templ..."
+	@echo ">> Generando codigo con sqlc y vistas con templ..."
 	@$(COMPOSE) exec app sqlc generate
 	@$(COMPOSE) exec app templ generate
 
-# Ejecuta las pruebas de integración SSR y PRG con hurl (el servidor debe estar corriendo)
+# ejecuta las pruebas de integracion con hurl
 ssr-test:
-	@echo ">> Ejecutando pruebas de integración SSR con hurl..."
+	@echo ">> Ejecutando pruebas de integracion con hurl..."
 	@$(COMPOSE) exec app hurl --test ssr_requests.hurl
 
-# Corre los tests de la capa de datos (sqlc) sobre una base de datos limpia
+# ejecuta los tests unitarios sobre una base limpia
 test: down
 	@$(COMPOSE) up -d --build --wait
 	@$(COMPOSE) exec app sqlc generate
@@ -31,7 +31,7 @@ test: down
 	$(COMPOSE) down -v --remove-orphans; \
 	exit $$TEST_EXIT
 
-# Baja los contenedores y borra los datos de la base
+# detiene y elimina contenedores y volumenes
 down:
-	@echo ">> Bajando contenedores y borrando volúmenes..."
+	@echo ">> Bajando contenedores y borrando volumenes..."
 	@$(COMPOSE) down -v --remove-orphans

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -19,12 +18,12 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-// Server almacena las consultas a la base de datos generadas por sqlc
+// almacena las consultas a la base de datos
 type Server struct {
 	queries *db.Queries
 }
 
-// Inicia la conexion a la base de datos, inicializa datos base, configura rutas SSR y levanta el servidor HTTP
+// inicia la conexion a la base de datos, datos iniciales y servidor http
 func main() {
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
@@ -47,35 +46,35 @@ func main() {
 	}
 	log.Println("Conectado a la base de datos correctamente")
 
-	// crea categorías iniciales si la tabla está vacía
+	// crea categorias iniciales si la tabla esta vacia
 	ctx := context.Background()
 	if err := server.asegurarCategoriasIniciales(ctx); err != nil {
-		log.Printf("Advertencia al verificar categorías iniciales: %v\n", err)
+		log.Printf("Advertencia al verificar categorias iniciales: %v\n", err)
 	}
 
 	mux := http.NewServeMux()
 
-	// archivos estáticos: css, imágenes, etc.
+	// archivos estaticos: css, fuentes, etc.
 	fileServer := http.FileServer(http.Dir("./static"))
 	mux.Handle("/static/", http.StripPrefix("/static/", fileServer))
 
-	// página principal renderizada con Templ
+	// pagina principal
 	mux.HandleFunc("/", server.handleIndex)
 
-	// formulario de alta de producto
+	// productos: listado htmx o alta
 	mux.HandleFunc("/productos", server.handleProductos)
 
-	// acciones sobre un producto (eliminar)
-	mux.HandleFunc("/productos/", server.handleProductoAcciones)
+	// operaciones sobre un producto especifico: borrado
+	mux.HandleFunc("/productos/", server.handleProductoByID)
 
 	port := ":8080"
-	log.Printf("Servidor SSR con Templ escuchando en http://localhost%s\n", port)
+	log.Printf("Servidor escuchando en http://localhost%s\n", port)
 	if err := http.ListenAndServe(port, mux); err != nil {
 		log.Fatalf("Error al iniciar el servidor: %s", err)
 	}
 }
 
-// asegurarCategoriasIniciales inserta categorías de ejemplo si la tabla está vacía
+// inserta categorias de ejemplo si la tabla esta vacia
 func (s *Server) asegurarCategoriasIniciales(ctx context.Context) error {
 	categorias, err := s.queries.ListarCategorias(ctx)
 	if err != nil {
@@ -97,16 +96,29 @@ func (s *Server) asegurarCategoriasIniciales(ctx context.Context) error {
 				Descripcion: sql.NullString{String: cat.desc, Valid: true},
 			})
 		}
-		log.Println("Categorías iniciales creadas exitosamente")
+		log.Println("Categorias iniciales creadas exitosamente")
 	}
 	return nil
 }
 
-// -----------------------------------------------------------------------------------------------
-// HANDLERS SSR Y PATRÓN POST / REDIRECT / GET (PRG)
-// -----------------------------------------------------------------------------------------------
+// consulta productos y categorias para renderizar el listado
+func (s *Server) obtenerDatosListado(ctx context.Context) ([]db.Producto, []db.Categoria, map[int32]string, error) {
+	productos, err := s.queries.ListarProductos(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	categorias, err := s.queries.ListarCategorias(ctx)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	catMap := make(map[int32]string, len(categorias))
+	for _, c := range categorias {
+		catMap[c.ID] = c.Nombre
+	}
+	return productos, categorias, catMap, nil
+}
 
-// handleIndex muestra la página principal con la lista de productos y el formulario de alta
+// muestra la pagina principal con el formulario y la lista de productos
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -114,61 +126,66 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "Método no permitido", http.StatusMethodNotAllowed)
+		http.Error(w, "metodo no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
 	ctx := r.Context()
-
-	// Obtener lista de productos
-	productos, err := s.queries.ListarProductos(ctx)
+	productos, categorias, catMap, err := s.obtenerDatosListado(ctx)
 	if err != nil {
-		log.Printf("Error al listar productos: %v", err)
-		http.Error(w, "Error al consultar productos", http.StatusInternalServerError)
+		log.Printf("error al obtener datos: %v", err)
+		http.Error(w, "error al consultar datos", http.StatusInternalServerError)
 		return
 	}
 
-	// Obtener lista de categorías
-	categorias, err := s.queries.ListarCategorias(ctx)
-	if err != nil {
-		log.Printf("Error al listar categorías: %v", err)
-		http.Error(w, "Error al consultar categorías", http.StatusInternalServerError)
-		return
-	}
-
-	// Mapa id -> nombre para resolver la categoría en la tabla
-	catMap := make(map[int32]string, len(categorias))
-	for _, c := range categorias {
-		catMap[c.ID] = c.Nombre
-	}
-
-	// mensajes de feedback pasados por query params
-	errorMsg := r.URL.Query().Get("error")
-	successMsg := r.URL.Query().Get("success")
-
-	// Renderizar componente Templ directamente en el http.ResponseWriter
-	component := views.IndexPage(productos, categorias, catMap, errorMsg, successMsg)
-	if err := component.Render(ctx, w); err != nil {
-		log.Printf("Error al renderizar IndexPage: %v", err)
-		http.Error(w, "Error interno del servidor", http.StatusInternalServerError)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := views.IndexPage(productos, categorias, catMap).Render(ctx, w); err != nil {
+		log.Printf("error al renderizar index: %v", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
 	}
 }
 
-// handleProductos despacha peticiones sobre /productos
+// despacha peticiones sobre /productos
 func (s *Server) handleProductos(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		s.crearProductoForm(w, r)
-	default:
-		// Redirige al inicio si navegan por GET /productos directamente
+		s.crearProductoHTMX(w, r)
+	case http.MethodGet:
+		// si es htmx devuelve solo la lista, sino redirige a la pagina principal
+		if r.Header.Get("HX-Request") == "true" {
+			ctx := r.Context()
+			productos, _, catMap, err := s.obtenerDatosListado(ctx)
+			if err != nil {
+				log.Printf("error al obtener productos: %v", err)
+				http.Error(w, "error al consultar productos", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			if err := views.EntityList(productos, catMap).Render(ctx, w); err != nil {
+				log.Printf("error al renderizar lista: %v", err)
+				http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+			}
+			return
+		}
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+	default:
+		http.Error(w, "metodo no permitido", http.StatusMethodNotAllowed)
 	}
 }
 
-// crearProductoForm procesa el formulario de alta y redirige al inicio (patrón PRG)
-func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
+// envia un fragmento de error para htmx
+func renderErrorHTMX(w http.ResponseWriter, r *http.Request, status int, msg string) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
+	if err := views.FeedbackPartial("error", msg).Render(r.Context(), w); err != nil {
+		log.Printf("error al renderizar feedback: %v", err)
+	}
+}
+
+// procesa el formulario de alta y devuelve la lista actualizada
+func (s *Server) crearProductoHTMX(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		redireccionarConError(w, r, "Datos de formulario inválidos")
+		renderErrorHTMX(w, r, http.StatusBadRequest, "datos de formulario invalidos")
 		return
 	}
 
@@ -178,26 +195,24 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 	stockStr := strings.TrimSpace(r.FormValue("stock"))
 	catIDStr := strings.TrimSpace(r.FormValue("id_categoria"))
 
-	// Conversión y validación básica de números
 	precio, err := strconv.ParseFloat(precioStr, 64)
 	if err != nil {
-		redireccionarConError(w, r, "El precio ingresado no es un número válido")
+		renderErrorHTMX(w, r, http.StatusBadRequest, "el precio ingresado no es valido")
 		return
 	}
 
 	stock, err := strconv.ParseFloat(stockStr, 64)
 	if err != nil {
-		redireccionarConError(w, r, "El stock ingresado no es un número válido")
+		renderErrorHTMX(w, r, http.StatusBadRequest, "el stock ingresado no es valido")
 		return
 	}
 
 	idCategoria, err := strconv.Atoi(catIDStr)
 	if err != nil || idCategoria <= 0 {
-		redireccionarConError(w, r, "Debe seleccionar una categoría válida")
+		renderErrorHTMX(w, r, http.StatusBadRequest, "debe seleccionar una categoria valida")
 		return
 	}
 
-	// valida las reglas de negocio antes de persistir
 	prodLogic := logic.Producto{
 		Nombre:      nombre,
 		Descripcion: descripcion,
@@ -206,23 +221,21 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 		IDCategoria: int32(idCategoria),
 	}
 	if err := logic.ValidateProduct(prodLogic); err != nil {
-		redireccionarConError(w, r, err.Error())
+		renderErrorHTMX(w, r, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	// verifica que la categoría exista en la base de datos
 	ctx := r.Context()
 	if _, err := s.queries.GetCategoria(ctx, int32(idCategoria)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			redireccionarConError(w, r, "La categoría seleccionada no existe")
+			renderErrorHTMX(w, r, http.StatusBadRequest, "la categoria seleccionada no existe")
 			return
 		}
-		log.Printf("Error al consultar categoría: %v", err)
-		redireccionarConError(w, r, "Error al verificar la categoría")
+		log.Printf("error al consultar categoria: %v", err)
+		renderErrorHTMX(w, r, http.StatusInternalServerError, "error al verificar la categoria")
 		return
 	}
 
-	// Persistir con sqlc
 	var descNull sql.NullString
 	if descripcion != "" {
 		descNull = sql.NullString{String: descripcion, Valid: true}
@@ -237,70 +250,63 @@ func (s *Server) crearProductoForm(w http.ResponseWriter, r *http.Request) {
 		IDCategoria: int32(idCategoria),
 	})
 	if err != nil {
-		log.Printf("Error al insertar producto: %v", err)
-		redireccionarConError(w, r, "No se pudo guardar el producto en la base de datos")
+		log.Printf("error al insertar producto: %v", err)
+		renderErrorHTMX(w, r, http.StatusInternalServerError, "no se pudo guardar el producto")
 		return
 	}
 
-	// redirige con mensaje de éxito
+	productos, categorias, catMap, err := s.obtenerDatosListado(ctx)
+	if err != nil {
+		log.Printf("error al consultar lista actualizada: %v", err)
+		renderErrorHTMX(w, r, http.StatusInternalServerError, "error al actualizar el listado")
+		return
+	}
+
 	msg := fmt.Sprintf("Producto '%s' creado exitosamente", nombre)
-	http.Redirect(w, r, "/?success="+url.QueryEscape(msg), http.StatusSeeOther)
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	if err := views.EntityListActualizada(productos, categorias, catMap, msg).Render(ctx, w); err != nil {
+		log.Printf("error al renderizar lista actualizada: %v", err)
+		http.Error(w, "error interno del servidor", http.StatusInternalServerError)
+	}
 }
 
-// handleProductoAcciones maneja acciones sobre un producto específico (eliminar)
-func (s *Server) handleProductoAcciones(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+// maneja operaciones sobre /productos/{id}
+func (s *Server) handleProductoByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		http.Error(w, "metodo no permitido", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extraer ID del path (/productos/{id}/eliminar) o del formulario
-	path := strings.TrimPrefix(r.URL.Path, "/productos/")
-	partes := strings.Split(strings.Trim(path, "/"), "/")
-
-	var id int
-	var err error
-
-	if len(partes) >= 1 && partes[0] != "" && partes[0] != "eliminar" {
-		id, err = strconv.Atoi(partes[0])
-	} else {
-		// Intento alternativo leyendo campo oculto 'id'
-		_ = r.ParseForm()
-		id, err = strconv.Atoi(r.FormValue("id"))
+	path := strings.Trim(strings.TrimPrefix(r.URL.Path, "/productos/"), "/")
+	if path == "" || strings.Contains(path, "/") {
+		renderErrorHTMX(w, r, http.StatusBadRequest, "identificador de producto invalido")
+		return
 	}
 
+	id, err := strconv.Atoi(path)
 	if err != nil || id <= 0 {
-		redireccionarConError(w, r, "Identificador de producto inválido")
+		renderErrorHTMX(w, r, http.StatusBadRequest, "identificador de producto invalido")
 		return
 	}
 
 	ctx := r.Context()
-
-	// Verificar existencia
-	prod, err := s.queries.GetProducto(ctx, int32(id))
-	if err != nil {
+	if _, err := s.queries.GetProducto(ctx, int32(id)); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			redireccionarConError(w, r, "El producto que intenta eliminar no existe")
+			renderErrorHTMX(w, r, http.StatusNotFound, "el producto no existe")
 			return
 		}
-		log.Printf("Error al obtener producto para borrar: %v", err)
-		redireccionarConError(w, r, "Error al verificar producto")
+		log.Printf("error al obtener producto: %v", err)
+		renderErrorHTMX(w, r, http.StatusInternalServerError, "error al verificar producto")
 		return
 	}
 
-	// Borrar con sqlc
 	if err := s.queries.BorrarProducto(ctx, int32(id)); err != nil {
-		log.Printf("Error al borrar producto: %v", err)
-		redireccionarConError(w, r, "No se pudo eliminar el producto")
+		log.Printf("error al borrar producto: %v", err)
+		renderErrorHTMX(w, r, http.StatusInternalServerError, "no se pudo eliminar el producto")
 		return
 	}
 
-	// redirige con mensaje de éxito tras eliminar
-	msg := fmt.Sprintf("Producto '%s' (#%d) eliminado correctamente", prod.Nombre, id)
-	http.Redirect(w, r, "/?success="+url.QueryEscape(msg), http.StatusSeeOther)
-}
-
-// redireccionarConError redirige al inicio con un mensaje de error en query param
-func redireccionarConError(w http.ResponseWriter, r *http.Request, msg string) {
-	http.Redirect(w, r, "/?error="+url.QueryEscape(msg), http.StatusSeeOther)
+	// 200 ok con cuerpo vacio para que htmx elimine la fila
+	w.WriteHeader(http.StatusOK)
 }

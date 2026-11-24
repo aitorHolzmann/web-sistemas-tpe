@@ -1,9 +1,6 @@
-/* ==============================================================================
-   MarkeTandil - Estilos de la Capa de Presentación (TP4)
-   Layouts con CSS Grid y Flexbox (08-view.pdf)
-   ============================================================================== */
+/* estilos de la capa de presentacion */
 
-/* Reseteo basico y tipografia */
+/* reseteo basico y tipografia */
 * {
   box-sizing: border-box;
   margin: 0;
@@ -17,7 +14,7 @@ body {
   line-height: 1.5;
 }
 
-/* Encabezado general */
+/* encabezado general */
 .encabezado {
   background-color: #1e3a8a;
   color: #ffffff;
@@ -36,10 +33,14 @@ body {
   color: #bfdbfe;
 }
 
-/* 
-   Layout Principal con CSS Grid (Filmina 57 de 08-view)
-   Organizamos la pagina en dos columnas: formulario a la izquierda y listado a la derecha
-*/
+/* mensajes de feedback */
+#mensajes-feedback {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* grilla principal */
 .contenedor-principal {
   display: grid;
   grid-template-columns: 360px 1fr;
@@ -49,7 +50,7 @@ body {
   padding: 0 1rem;
 }
 
-/* Secciones como tarjetas */
+/* secciones como tarjetas */
 .seccion-formulario,
 .seccion-listado {
   background: #ffffff;
@@ -68,10 +69,7 @@ body {
   padding-bottom: 0.5rem;
 }
 
-/* 
-   Formulario con Flexbox (Filmina 54 de 08-view)
-   Organizacion vertical de los campos
-*/
+/* formulario */
 #form-producto {
   display: flex;
   flex-direction: column;
@@ -90,7 +88,8 @@ body {
   color: #475569;
 }
 
-.campo input {
+.campo input,
+.campo select {
   padding: 0.6rem 0.8rem;
   border: 1px solid #cbd5e1;
   border-radius: 4px;
@@ -98,13 +97,14 @@ body {
   transition: border-color 0.2s;
 }
 
-.campo input:focus {
+.campo input:focus,
+.campo select:focus {
   outline: none;
   border-color: #2563eb;
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
 }
 
-/* Botones */
+/* botones */
 button {
   cursor: pointer;
   font-weight: 600;
@@ -153,7 +153,7 @@ button {
   background-color: #b91c1c;
 }
 
-/* Encabezado del listado con Flexbox */
+/* encabezado del listado */
 .encabezado-listado {
   display: flex;
   justify-content: space-between;
@@ -169,7 +169,7 @@ button {
   padding-bottom: 0;
 }
 
-/* Lista de productos con Flexbox en cada item */
+/* lista de productos */
 .lista-productos {
   list-style: none;
   display: flex;
@@ -244,7 +244,7 @@ button {
   border-radius: 3px;
 }
 
-/* Mensajes de feedback visual */
+/* mensajes de feedback visual */
 .mensaje-oculto {
   display: none;
 }
@@ -276,9 +276,7 @@ button {
   font-style: italic;
 }
 
-/* 
-   Diseño responsivo para pantallas pequeñas / móviles (Grid de 1 columna)
-*/
+/* responsivo para pantallas pequeñas */
 @media (max-width: 768px) {
   .contenedor-principal {
     grid-template-columns: 1fr;
@@ -297,4 +295,3 @@ button {
     margin-top: 0.5rem;
   }
 }
-

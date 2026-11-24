@@ -1,0 +1,29 @@
+package views
+
+import (
+	db "tpe/db/sqlc"
+)
+
+templ FeedbackPartial(tipo string, mensaje string) {
+	<hx-partial hx-target="#mensajes-feedback" hx-swap="innerHTML">
+		if tipo == "error" {
+			<div class="mensaje error" role="alert">
+				<strong>Error: </strong> { mensaje }
+			</div>
+		} else if tipo == "exito" {
+			<div class="mensaje exito" role="status">
+				{ mensaje }
+			</div>
+		}
+	</hx-partial>
+}
+
+templ EntityListActualizada(productos []db.Producto, categorias []db.Categoria, categoriasMap map[int32]string, successMsg string) {
+	@EntityList(productos, categoriasMap)
+	if successMsg != "" {
+		@FeedbackPartial("exito", successMsg)
+	}
+	<hx-partial hx-target="#seccion-formulario" hx-swap="outerHTML">
+		@EntityForm(categorias)
+	</hx-partial>
+}

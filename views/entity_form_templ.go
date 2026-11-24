@@ -34,7 +34,7 @@ func EntityForm(categorias []db.Categoria) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section class=\"seccion-formulario\" aria-labelledby=\"form-heading\"><h2 id=\"form-heading\">Nuevo Producto</h2><form method=\"POST\" action=\"/productos\" id=\"form-producto\"><div class=\"campo\"><label for=\"nombre\">Nombre (*):</label> <input type=\"text\" id=\"nombre\" name=\"nombre\" placeholder=\"Ej: Yerba Mate 1kg\" required></div><div class=\"campo\"><label for=\"id_categoria\">Categoría (*):</label> <select id=\"id_categoria\" name=\"id_categoria\" required>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<section id=\"seccion-formulario\" class=\"seccion-formulario\" aria-labelledby=\"form-heading\"><h2 id=\"form-heading\">Nuevo Producto</h2><form id=\"form-producto\" hx-post=\"/productos\" hx-target=\"#lista-productos\" hx-swap=\"outerHTML\"><div class=\"campo\"><label for=\"nombre\">Nombre (*):</label> <input type=\"text\" id=\"nombre\" name=\"nombre\" placeholder=\"Ej: Yerba Mate 1kg\" required></div><div class=\"campo\"><label for=\"id_categoria\">Categoría (*):</label> <select id=\"id_categoria\" name=\"id_categoria\" required>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

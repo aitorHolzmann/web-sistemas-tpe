@@ -6,10 +6,9 @@ import (
 )
 
 templ EntityList(productos []db.Producto, categoriasMap map[int32]string) {
-	<section class="seccion-listado" aria-labelledby="list-heading">
+	<section id="lista-productos" class="seccion-listado" aria-labelledby="list-heading">
 		<div class="encabezado-listado">
 			<h2 id="list-heading">Listado de Productos</h2>
-			<small style="color: #64748b;">{ fmt.Sprintf("%d producto(s) en total", len(productos)) }</small>
 		</div>
 
 		if len(productos) == 0 {
@@ -50,15 +49,16 @@ templ EntityList(productos []db.Producto, categoriasMap map[int32]string) {
 								<td><strong style="color: #15803d;">{ "$" + p.Precio }</strong></td>
 								<td>{ p.Stock }</td>
 								<td style="text-align: right;">
-									<form method="POST" action={ templ.SafeURL(fmt.Sprintf("/productos/%d/eliminar", p.ID)) } style="margin: 0; display: inline-block;">
-										<button
-											type="submit"
-											class="btn-eliminar"
-											onclick="return confirm('¿Estás seguro de que deseas eliminar este producto?');"
-										>
-											Eliminar
-										</button>
-									</form>
+									<button
+										type="button"
+										class="btn-eliminar"
+										hx-delete={ fmt.Sprintf("/productos/%d", p.ID) }
+										hx-target="closest tr"
+										hx-swap="outerHTML"
+										hx-confirm="¿Estás seguro de que deseas eliminar este producto?"
+									>
+										Eliminar
+									</button>
 								</td>
 							</tr>
 						}

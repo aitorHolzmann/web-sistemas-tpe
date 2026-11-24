@@ -42,7 +42,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><!-- Pico.css: se enlaza localmente para funcionamiento offline y CDN según consigna --><link rel=\"stylesheet\" href=\"/static/pico.min.css\"><!-- Estilos complementarios del proyecto servidos desde /static/ --><link rel=\"stylesheet\" href=\"/static/styles.css\"></head><body><header class=\"encabezado\"><h1>MarkeTandil</h1><p>Panel de Gestión de Productos - Renderizado en Servidor con Templ (TP5)</p></header><main class=\"container\" style=\"padding-top: 1.5rem; padding-bottom: 3rem;\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "</title><!-- pico css y estilos propios --><link rel=\"stylesheet\" href=\"/static/pico.min.css\"><link rel=\"stylesheet\" href=\"/static/styles.css\"><!-- htmx 4.0 --><script src=\"https://cdn.jsdelivr.net/npm/htmx.org@4.0.0/dist/htmx.min.js\" integrity=\"sha384-BvJpBiO8Kh31EqtJe5DRIeWrHWnCGkwytKs9NKFi86Hhw96dEqdEMzZDeK9iEGTc\" crossorigin=\"anonymous\"></script></head><body><header class=\"encabezado\"><h1>MarkeTandil</h1><p>Panel de Gestión de Productos</p></header><main class=\"container\" style=\"padding-top: 1.5rem; padding-bottom: 3rem;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
